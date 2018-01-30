@@ -5,8 +5,11 @@
 #define INPUT_DELIMITER ","
 
 /** Configuration options:
-- sets a 4 string weapon id + weapon type
-GUN,1111,0$
+- sets a 4 string weapon id + team id + weapon type
+GUN,1111,0,0$
+
+-enables and disables friendly fire
+FRIEND,ENABLED$ | FRIEND,DISABLED$
 
 - sets the timeout after hit was received
 HIT,4000$
@@ -62,20 +65,31 @@ void parseGun() {
 
   subStr = strtok (NULL, INPUT_DELIMITER);
   if(!subStr) { return; }
+  // get team id
+  uint8_t teamId = atoi(subStr) & 0xf;
+
+  subStr = strtok (NULL, INPUT_DELIMITER);
+  if(!subStr) { return; }
   // get gun type
   uint8_t gunType = atoi(subStr) & 0xf;
 
   // set global weapon id
   gWeaponId = weaponId;
 
-  // 3 hex = laser tag id (always f0f)
-  // 4 hex = weapon id (range from 0 to 0xffff)
-  // 1 hex = gun type (0-15)
-  gShotIdHex = 0xf0f00000 | (gWeaponId << 4) | gunType;
+  // set global team id
+  gTeamId = teamId;
+  
+  // 2 hex = laser tag id (always 0xaa)
+  // 4 hex = weapon id (range from 0x0 to 0xffff)
+  // 1 hex = team id (range from 0x0 - 0xf)
+  // 1 hex = gun type (0x0-0xf)
+  gShotIdHex = 0xaa000000 | (gWeaponId << 8) | (gTeamId << 4) | gunType;
 
   #ifdef PRINT_DEBUG
   Serial.print("Weapon Id: ");
   Serial.println(weaponId, HEX);
+  Serial.print("Team Id: ");
+  Serial.println(teamId, HEX);
   Serial.print("Gun type: ");
   Serial.println(gunType, HEX);
   Serial.print("Shot ID: ");
@@ -83,6 +97,24 @@ void parseGun() {
   #endif
 }
 
+void parseFriendlyFire() {
+  char* subStr = strtok (NULL, INPUT_DELIMITER);
+  if(!subStr) { return; }
+
+  if (strcmp(subStr, "ENABLED") == 0) {
+    gFriendlyEnabled = true;    
+    #ifdef PRINT_DEBUG
+    Serial.println("Friendly enabled");
+    #endif
+    
+  } else if (strcmp(subStr, "DISABLED") == 0) {
+    gFriendlyEnabled = false;
+    #ifdef PRINT_DEBUG
+    Serial.println("Friendly disabled");
+    #endif
+    
+  }
+}
 
 void parseHitTimeout() {
   char* subStr = strtok (NULL, INPUT_DELIMITER);
@@ -159,6 +191,8 @@ void parseInputBuffer() {
   }
   if (strcmp(subStr, "GUN") == 0) {
     parseGun();
+  } else if (strcmp(subStr, "FRIEND") == 0) {
+    parseFriendlyFire();
   } else if (strcmp(subStr, "HIT") == 0) {
     parseHitTimeout();
   } else if (strcmp(subStr, "SHOT") == 0) {
